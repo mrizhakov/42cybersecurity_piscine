@@ -1,0 +1,10 @@
+python3 -m pip install requests beautifulsoup4
+
+with virtual environment
+cd /Users/mrizhakov/Documents/42/42cybersecurity_piscine/1_arachnid
+
+python3 -m venv .venv
+source .venv/bin/activate
+
+python -m pip install requests beautifulsoup4
+python spyder.py
