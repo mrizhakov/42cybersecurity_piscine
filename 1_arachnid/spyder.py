@@ -77,4 +77,7 @@ for img in img_link:
 
 
 next_links = soup.find_all("a href")
+for link in next_links:
+    print(f"Found the following links on the page: {link}")
+
 
