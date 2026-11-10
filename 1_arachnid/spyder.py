@@ -34,6 +34,7 @@ print(f"Level of recursion {args.level}")
 
 save_path = args.path
 visited_links = set()
+all_scraped_links = set()
 downloaded_images = set()
 start_url = args.start_url
 
@@ -68,16 +69,23 @@ for img in img_link:
     img_download_link = urljoin(start_url, img['src'])
     img_download = requests.get(img_download_link)
     img_download.raise_for_status()
-    downloaded_images.add(img_download_link)
     filename = save_path + img['src']
+    if img_download_link not in downloaded_images:
+        with open(filename, "wb") as file:
+            file.write(img_download.content)
+            print(f"Downloading image from: {img_download_link} to {filename}")
+            downloaded_images.add(img_download_link)
 
-    with open(filename, "wb") as file:
-        file.write(img_download.content)
-        print(f"Downloading image from: {img_download_link} to {filename}")
+    else:
+        print(f"Skipping downloading image {img_download_link} since it was already downloaded")
 
 
-next_links = soup.find_all("a href")
+
+next_links = soup.find_all("a")
 for link in next_links:
-    print(f"Found the following links on the page: {link}")
+    
+    full_link= urljoin(start_url, link.get("href"))
+    #print(f"Found the following links on the page: {full_link}")
+    all_scraped_links.add(full_link)
 
 
