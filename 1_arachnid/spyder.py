@@ -5,26 +5,71 @@ import requests
 import argparse
 from bs4 import BeautifulSoup
 
-parser = argparse.ArgumentParser(description="A simple web scraper to download images from a webpage.")
-#parser.add_argument("--url", type=str, default="https://crawler-test.com/links/image)
-parser.add_argument('-p', 
-                    '--path', 
-                    type=str, 
-                    default="./data/", 
-                    help="The starting URL to scrape for images.") 
-parser.add_argument('-r', 
-                    '--recursive', 
-                    action='store_true', 
-                    help="Recursively scrape links found on the page, default value is 5.")
-parser.add_argument('-l', 
-                    '--level',
-                    type=int,
-                    default = 5, 
-                    help="Level of recursion, default value is 5.")
+def parsing_arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="A simple web scraper to download images from a webpage.")
+    parser.add_argument('-p', 
+                        '--path', 
+                        type=str, 
+                        default="./data/", 
+                        help="The starting URL to scrape for images.") 
+    parser.add_argument('-r', 
+                        '--recursive', 
+                        action='store_true', 
+                        help="Recursively scrape links found on the page, default value is 5.")
+    parser.add_argument('-l', 
+                        '--level',
+                        type=int,
+                        default = 5, 
+                        help="Level of recursion, default value is 5.")
 
-parser.add_argument("start_url", help="Webpage to scrape")
+    parser.add_argument("start_url", help="Webpage to scrape")
 
-args = parser.parse_args()
+
+    return parser.parse_args()
+
+
+
+def arg_check(args: argparse.Namespace) -> None:
+    save_path = args.path
+
+    if args.level < 1:
+        print(f"Level of recursion cant be zero or negative")
+        sys.exit(1)
+
+    path = Path(save_path)
+
+    if path.is_absolute() or path.is_file():
+        print(f"Provide a valid path to download images")
+        sys.exit(1)
+
+args = parsing_arguments()
+arg_check(args)
+
+
+
+  
+        
+
+# parser = argparse.ArgumentParser(description="A simple web scraper to download images from a webpage.")
+# #parser.add_argument("--url", type=str, default="https://crawler-test.com/links/image)
+# parser.add_argument('-p', 
+#                     '--path', 
+#                     type=str, 
+#                     default="./data/", 
+#                     help="The starting URL to scrape for images.") 
+# parser.add_argument('-r', 
+#                     '--recursive', 
+#                     action='store_true', 
+#                     help="Recursively scrape links found on the page, default value is 5.")
+# parser.add_argument('-l', 
+#                     '--level',
+#                     type=int,
+#                     default = 5, 
+#                     help="Level of recursion, default value is 5.")
+
+# parser.add_argument("start_url", help="Webpage to scrape")
+
+# args = parser.parse_args()
 print(f"Scraping website {args.start_url} for images")
 print(f"Downloading files to {args.path}")
 print(f"Downloads should be recursive {args.recursive}")
@@ -32,7 +77,6 @@ print(f"Level of recursion {args.level}")
 
 
 
-save_path = args.path
 visited_links = set()
 all_scraped_links = set()
 downloaded_images = set()
@@ -40,18 +84,7 @@ start_url = args.start_url
 
 #start_url = "https://crawler-test.com/links/image_links"
 #url = "https://en.wikipedia.org/wiki/Spinning_top"
-if args.level < 0:
-    print(f"Level of recursion cant be zero or negative")
-    sys.exit(1)
 
-
-path = Path(save_path)
-
-if path.is_absolute() or path.is_file():
-    print(f"Provide a valid path to download images")
-    sys.exit(1)
-else:
-    path.mkdir(exist_ok=True)
 
 try:
     response = requests.get(start_url)
@@ -59,22 +92,32 @@ try:
     print(f"Scraping page: {start_url}")
 except requests.exceptions.RequestException as error:
     print(f"{error}")
+    sys.exit(1)
+
 
 visited_links.add(start_url)
+all_scraped_links.add(start_url)
+
 html = response.text
 soup = BeautifulSoup(html, "html.parser")
 
 img_link = soup.find_all("img")
 for img in img_link:
     img_download_link = urljoin(start_url, img['src'])
-    img_download = requests.get(img_download_link)
-    img_download.raise_for_status()
-    filename = save_path + img['src']
+
     if img_download_link not in downloaded_images:
-        with open(filename, "wb") as file:
-            file.write(img_download.content)
-            print(f"Downloading image from: {img_download_link} to {filename}")
-            downloaded_images.add(img_download_link)
+        try:
+            img_download = requests.get(img_download_link)
+            img_download.raise_for_status()
+            filename = args.path + img['src']
+            with open(filename, "wb") as file:
+                file.write(img_download.content)
+                print(f"Downloading image from: {img_download_link} to {filename}")
+                downloaded_images.add(img_download_link)
+        except requests.exceptions.RequestException as error:
+            print(f"{error}")
+            print(f"Failed to download image from {img_download_link}")
+
 
     else:
         print(f"Skipping downloading image {img_download_link} since it was already downloaded")
