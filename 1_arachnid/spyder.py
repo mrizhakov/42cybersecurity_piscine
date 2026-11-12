@@ -10,7 +10,16 @@ downloaded_images = set()
 all_already_scraped_links = set()
 current_level = 0
 
-
+def correct_dup_filename(filename: str) -> str:
+    original = Path(args.path) / Path(filename).name
+    candidate = original
+    unique_id = 0
+    while candidate.is_file():
+        candidate = original.with_name(
+            f"{original.stem}_{unique_id}{original.suffix}"
+        )
+        unique_id += 1
+    return str(candidate)
 
 
 def parsing_arguments() -> argparse.Namespace:
@@ -31,7 +40,6 @@ def parsing_arguments() -> argparse.Namespace:
                         help="Level of recursion, default value is 5.")
 
     parser.add_argument("start_url", help="Webpage to scrape")
-
 
 
     return parser.parse_args()
@@ -79,45 +87,52 @@ class Link:
         if self.soup:
             img_link = self.soup.find_all("img")
         else:
-            print(f"Class Link: Failed to download images from {self.url}")
+            print(f"Failed to download images from {self.url}")
             return
-
 
         for img in img_link:
             img_download_link = urljoin(self.url, img['src'])
             print(f"Self.url is :  {self.url}")
+            print(f"Downloaded_images set is {downloaded_images}")
+
 
             if img_download_link not in downloaded_images:
                 try:
-                    img_download = requests.get(img_download_link)
+                    # img_download = requests.get(img_download_link)
+                    img_download = requests.get(img_download_link, timeout=(5, 10))
                     img_download.raise_for_status()
-                    # filename = args.path + img['src']
+                except requests.exceptions.RequestException as error:
+                    print({error})
+
+
+                try:
                     filename = Path(urljoin(args.path, img['src'])).name
                     dirfilename = "./" + str(Path(urljoin(args.path, filename)))
 
-                    print(f"args.path is :  {args.path}")
-                    print(f"img['src'] is :  {img['src']}")
-                    print(f"filename is :  {filename}")
-                    print(f"dirfilename is :  {dirfilename}")
                     os.makedirs(args.path, exist_ok=True)
+                    print(f"Downloaded_images set is {downloaded_images}")
+                    print(f"dirfilename  is {dirfilename}")
 
+                    sys.exit(1)
+
+
+                    dirfilename = correct_dup_filename(dirfilename, downloaded_images)
 
                     with open(dirfilename, "wb") as file:
                         file.write(img_download.content)
-                        print(f"Class Link: Downloading image from: {img_download_link} to {filename}")
+                        print(f"Downloading image from: {img_download_link}, saving to {filename}")
                         downloaded_images.add(img_download_link)
-                except requests.exceptions.RequestException as error:
-                    print(f"{error}")
-                    print(f"Class Link: Failed to download image from {img_download_link}")
+                except OSError as error:
+                    print(f"Failed to save image at {dirfilename}, {error}")
             else:
-                print(f"Class Link: Skipping downloading image {img_download_link} since it was already downloaded")
+                print(f"Skipping downloading image {img_download_link} since it was already downloaded")
     
     def getLinks(self) -> None:
 
         if self.soup:
             next_links = self.soup.find_all("a")
         else:
-            print(f"Class Link: Failed to scrape links from {self.url}")
+            print(f"Failed to scrape links from {self.url}")
             return
     
 
@@ -125,28 +140,38 @@ class Link:
             full_link= urljoin(self.url, link_iter.get("href"))
             print(f"Found the following links on the page: {full_link}")
             
-
             domain = urlparse(full_link).netloc
-            if self.domain == domain and current_level < args.level:        
+            if self.domain == domain and current_level <= args.level:
+                print(f"Links {full_link} is unique, will proceed to scrape")
+
                 all_unique_links[current_level + 1].add(full_link)
             else:
-                print(f"Skipping link {full_link} since it is an external domain {domain}")
+                if self.domain == domain:
+                    print(f"Skipping link {full_link} since it is an external domain {domain}")
+                if current_level > args.level:
+                    print(f"Skipping link {full_link} since it is recursion level {current_level} exceeds specified {args.level}")
+
+     
+
 
 args = parsing_arguments()
 args.path = args.path if args.path.endswith("/") else args.path + "/"
 arg_check(args)
-all_unique_links = [set() for _ in range(args.level+1)]
+all_unique_links = [set() for _ in range(args.level+2)]
 
+print(f"Scraping website {args.start_url} for images")
+print(f"Downloading files to {args.path}")
+print(f"Downloads should be recursive {args.recursive}")
+print(f"Level of recursion {args.level}")
 
-
-
+print(f"----------------current level is {current_level}------------ ")
+print(f"----------------args.level is {args.level}------------ ")
 link1 = Link(args.start_url)
 link1.getPage()
 link1.getLinks()
 link1.downloadImages()
-pending_links = [set() for _ in range(args.level+1)]
+pending_links = [set() for _ in range(args.level+2)]
 pending_links[current_level] = all_unique_links[current_level] - all_already_scraped_links
-print(f"----------------current level is {current_level}------------ ")
 
 while current_level <= args.level:
 
@@ -169,30 +194,8 @@ while current_level <= args.level:
         print(f"----------------args.level is {args.level}------------ ")
         
         pending_links[current_level] = all_unique_links[current_level] - all_already_scraped_links
-        
+
     current_level = current_level + 1
 
 print(f"`----------------------level is {current_level}")
 print(f"----------------args.level is {args.level}------------ ")
-
-
-
-
-
-# first = next(iter(pending_links))
-# print(f"Checking link {first}")
-    
-# temp_link_obj = Link(first)
-# temp_link_obj.getPage()
-# temp_link_obj.getLinks()
-# temp_link_obj.downloadImages()
-# all_already_scraped_links.add(first)
-# pending_links = all_unique_links - all_already_scraped_links
-
-
-print(f"Scraping website {args.start_url} for images")
-print(f"Downloading files to {args.path}")
-print(f"Downloads should be recursive {args.recursive}")
-print(f"Level of recursion {args.level}")
-
-start_url = args.start_url
