@@ -7,8 +7,9 @@ from bs4 import BeautifulSoup, ResultSet
 import os
 
 downloaded_images = set()
-all_unique_links = set()
 all_already_scraped_links = set()
+current_level = 0
+
 
 
 
@@ -126,14 +127,16 @@ class Link:
             
 
             domain = urlparse(full_link).netloc
-            if self.domain == domain:
-                all_unique_links.add(full_link)
+            if self.domain == domain and current_level < args.level:        
+                all_unique_links[current_level + 1].add(full_link)
             else:
                 print(f"Skipping link {full_link} since it is an external domain {domain}")
 
 args = parsing_arguments()
 args.path = args.path if args.path.endswith("/") else args.path + "/"
 arg_check(args)
+all_unique_links = [set() for _ in range(args.level+1)]
+
 
 
 
@@ -141,25 +144,39 @@ link1 = Link(args.start_url)
 link1.getPage()
 link1.getLinks()
 link1.downloadImages()
-pending_links = all_unique_links - all_already_scraped_links
-print(f"##############This is pending links before loop: {pending_links}")
+pending_links = [set() for _ in range(args.level+1)]
+pending_links[current_level] = all_unique_links[current_level] - all_already_scraped_links
+print(f"----------------current level is {current_level}------------ ")
 
-while pending_links:
-    if link1.level >= args.level:
-        break
-    first = next(iter(pending_links))
-    print(f"Checking link {first}")
-    
-    temp_link_obj = Link(first)
-    temp_link_obj.getPage()
-    temp_link_obj.getLinks()
-    temp_link_obj.downloadImages()
-    all_already_scraped_links.add(first)
-    pending_links = all_unique_links - all_already_scraped_links
-    link1.level = link1.level + 1
-    print(f"`----------------------level is {link1.level}")
-    print(f"##############This is pending links after loop: {pending_links}")
-    print(f"##############This is pending links after loop: {pending_links}")
+while current_level <= args.level:
+
+    print(f"----------------current level is {current_level}------------ ")
+    print(f"----------------args.level is {args.level}------------ ")
+    pending_links[current_level] = all_unique_links[current_level] - all_already_scraped_links
+
+
+    while pending_links[current_level]:
+        
+        first = next(iter(pending_links[current_level]))
+        print(f"Checking link {first}")
+        
+        temp_link_obj = Link(first)
+        temp_link_obj.getPage()
+        temp_link_obj.getLinks()
+        temp_link_obj.downloadImages()
+        all_already_scraped_links.add(first)
+        print(f"----------------current level is {current_level}------------ ")
+        print(f"----------------args.level is {args.level}------------ ")
+        
+        pending_links[current_level] = all_unique_links[current_level] - all_already_scraped_links
+        
+    current_level = current_level + 1
+
+print(f"`----------------------level is {current_level}")
+print(f"----------------args.level is {args.level}------------ ")
+
+
+
 
 
 # first = next(iter(pending_links))
